@@ -1,0 +1,14 @@
+*~
+*.bak
+*.dep
+*.exe
+*.zo
+.DS_Store/
+.vscode
+\#*
+compiled/
+mceval
+lazy-mceval
+run-tests
+test-mceval
+test-lazy-mceval
