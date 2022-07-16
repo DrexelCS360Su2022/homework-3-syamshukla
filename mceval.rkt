@@ -27,6 +27,11 @@
          (make-procedure (lambda-parameters exp)
                          (lambda-body exp)
                          env))
+        ((and? exp) (eval-and (cdr exp) env))
+        ((or? exp) (eval-or (cdr exp) env))
+        ((let? exp) (mceval (let->combination exp) env))
+        ((delay? exp) (delay->lambda (cdr exp)))
+        ((force? exp) (delay->lambda (cdr exp)))
         ((begin? exp)
          (eval-sequence (begin-actions exp) env))
         ((cond? exp) (mceval (cond->if exp) env))
@@ -35,6 +40,62 @@
                   (list-of-values (operands exp) env)))
         (else
          (error "Unknown expression type -- EVAL" exp))))
+(define (and? exp) (tagged-list? exp 'and))
+(define (eval-and exp env)
+  (if (null? exp) #t 
+        (if (false? (mceval (car exp) env)) #f 
+           (eval-and (cdr exp) env)
+        )
+  )
+  )
+(define (or? exp) (tagged-list? exp 'or))
+(define (eval-or exp env)
+  (if (null? exp) #f
+      (if (mceval (car exp) env) (mceval (car exp) env) (eval-or (cdr exp) env))
+      )
+  )
+(define (let? exp) (tagged-list? exp 'let))
+
+
+(define (let->combination exp)
+  (let [ (body (let-body exp))
+         (var (let-vars exp))
+         (val (let-val exp)) ]
+    (cons (make-lambda var body) val)
+    )
+  )
+(define (force? exp)
+  (tagged-list? exp 'force)
+  )
+(define (let-vars exp)
+  (map car (cadr exp))
+)
+(define (let-body exp)
+    (cddr exp)
+)
+
+(define (let-val exp)
+  (map cadr (cadr exp)))
+
+
+(define (delay? exp)
+  (tagged-list? exp 'delay)
+  )
+
+(define  (delay->lambda exp)
+  (memo-proc (lambda () (exp)))
+  )
+
+(define (memo-proc proc)
+    (let ((already-run? false)
+        (result null))
+  (lambda ()
+    (if (not already-run?)
+                 (begin (set! result (proc))
+                        (set! already-run? true)
+                        (mceval (result)))
+                 (mceval (result))))))
+ 
 
 (define (mcapply procedure arguments)
   (cond ((primitive-procedure? procedure)
@@ -90,6 +151,7 @@
 
 (define (quoted? exp)
   (tagged-list? exp 'quote))
+(define (and exp) (cadr exp))
 
 (define (text-of-quotation exp) (cadr exp))
 
@@ -208,6 +270,7 @@
   (eq? x false))
 
 
+
 (define (make-procedure parameters body env)
   (list 'procedure parameters body env))
 
@@ -300,14 +363,29 @@
 
 (define (primitive-implementation proc) (cadr proc))
 
+(define (error-call)
+  (error "Metacircular Interpreter Aborted")
+  )
+
 (define primitive-procedures
   (list (list 'car car)
         (list 'cdr cdr)
         (list 'cons cons)
         (list 'null? null?)
 ;;      more primitives
+        (list '+ +)
+        (list '- -)
+        (list '* *)
+        (list '/ /)
+        (list '< <)
+        (list '> >)
+        (list '<= <=)
+        (list '>= >=)
+        (list '= =)
+        (list 'error error-call)
         ))
 
+  
 (define (primitive-procedure-names)
   (map car
        primitive-procedures))
@@ -345,7 +423,7 @@
                           #t)])
           (let ([input (read)])
             (if (eof-object? input)
-                (begin
+                (begin 
                   (newline)
                   #f)
                 (let ([output (mceval input the-global-environment)])
@@ -360,3 +438,5 @@
 (provide mceval
          setup-environment
          main)
+
+(main)
