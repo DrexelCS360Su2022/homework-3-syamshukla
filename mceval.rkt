@@ -30,8 +30,8 @@
         ((and? exp) (eval-and (cdr exp) env))
         ((or? exp) (eval-or (cdr exp) env))
         ((let? exp) (mceval (let->combination exp) env))
-        ((delay? exp) (delay->lambda (cdr exp)))
-        ((force? exp) (delay->lambda (cdr exp)))
+        ((delay? exp) (delay->lambda (rest exp)))
+        ((force? exp) (force (cdr exp) env))
         ((begin? exp)
          (eval-sequence (begin-actions exp) env))
         ((cond? exp) (mceval (cond->if exp) env))
@@ -82,19 +82,35 @@
   (tagged-list? exp 'delay)
   )
 
-(define  (delay->lambda exp)
-  (memo-proc (lambda () (exp)))
+(define (delay->lambda exp)
+  (let [(already-run? #f)
+        (result null)]
+  (if (equal? already-run? #t)
+      (result)
+      (begin (set! result (make-lambda '() (car exp)))
+                        (set! already-run? #t)
+                        
+                        result)
+  )
+    )
+  )
+
+(define (force obj env)
+  (mceval (delay->lambda (car obj)) env)
   )
 
 (define (memo-proc proc)
-    (let ((already-run? false)
-        (result null))
-  (lambda ()
-    (if (not already-run?)
+    (let [(already-run? #f)
+        (result null)]
+  (lambda () 
+    (if (equal? already-run? #t) (result)
                  (begin (set! result (proc))
-                        (set! already-run? true)
-                        (mceval (result)))
-                 (mceval (result))))))
+                        (set! already-run? #t)
+                        result)
+                 ))
+      )
+  )
+  
  
 
 (define (mcapply procedure arguments)
